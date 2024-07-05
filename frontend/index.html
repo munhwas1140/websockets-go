@@ -32,6 +32,34 @@
 
         var selectedchat = "general";
 
+        class Event {
+            constructor(type, payload) {
+                this.type = type;
+                this.payload = payload;
+            }
+        }
+
+        function routeEvent(event) {
+            if (event.type === undefined) {
+                alert("no type filed in the event");
+            }
+
+            switch(event.type) {
+                case "new_message": 
+                    console.log("new message");
+                    break;
+                default:
+                    alert("unsupported message type");
+                    break;
+            }
+        }
+
+        function sendEvent(eventName, payload) {
+            const event = new Event(eventName, payload);
+            conn.send(JSON.stringify(event))
+
+        }
+
         function changeChatRoom() {
             var newchat = document.getElementById("chatroom");
             if (newchat != null && newchat.value != selectedchat) {
@@ -39,10 +67,11 @@
             }
             return false;
         }
+
         function sendMessage() {
             var newmessage = document.getElementById("message");
             if (newmessage != null) {
-                console.log(newmessage);
+                sendEvent("send_message", newmessage.value);
             }
             return false;
         }
@@ -54,6 +83,14 @@
                 console.log("supports websockets");
                 // connect to ws
                 conn = new WebSocket("ws://" + document.location.host + "/ws");
+
+                conn.onmessage = function(evt) {
+                    const eventData = JSON.parse(evt.data);
+
+                    const event = Object.assign(new Event, eventData);
+
+                    routeEvent(event);
+                }
             } else {
                 alert("Not supporting websockets");
             }
