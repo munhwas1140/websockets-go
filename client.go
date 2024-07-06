@@ -42,6 +42,8 @@ func (c *Client) readMessages() {
 		return
 	}
 
+	c.connection.SetReadLimit(512)
+
 	c.connection.SetPongHandler(c.pongHandler)
 
 	for {
@@ -99,7 +101,7 @@ func (c *Client) writeMessages() {
 
 			// send a ping to the client
 			if err := c.connection.WriteMessage(websocket.PingMessage, []byte("")); err != nil {
-				log.Println("writemes err: ", err)
+				log.Println("writemsg err: ", err)
 				return
 			}
 		}
