@@ -43,10 +43,50 @@ func NewManager(ctx context.Context) *Manager {
 
 func (m *Manager) setupEventHandlers() {
 	m.handlers[EventSendMessage] = SendMessage
+	m.handlers[EventChangeRoom] = ChatRoomHandler
+}
+
+func ChatRoomHandler(event Event, c *Client) error {
+	var changeRoomEvent ChangeRoomEvent
+
+	if err := json.Unmarshal(event.Payload, &changeRoomEvent); err != nil {
+		return fmt.Errorf("Bad payload in request: %v", err)
+	}
+
+	c.chatroom = changeRoomEvent.Name
+
+	return nil
 }
 
 func SendMessage(event Event, c *Client) error {
-	fmt.Println(event)
+	var chatEvent SendMessageEvent
+
+	if err := json.Unmarshal(event.Payload, &chatEvent); err != nil {
+		return fmt.Errorf("bad payload in request: %v", err)
+	}
+
+	var broadMessage NewMessageEvent
+
+	broadMessage.Sent = time.Now()
+	broadMessage.Message = chatEvent.Message
+	broadMessage.From = chatEvent.From
+
+	data, err := json.Marshal(broadMessage)
+	if err != nil {
+		return fmt.Errorf("failed to marshal broadcast message: %v", err)
+	}
+
+	outgointEvent := Event{
+		Payload: data,
+		Type:    EventNewMessage,
+	}
+
+	for client := range c.manager.clients {
+		if client.chatroom == c.chatroom {
+			client.egress <- outgointEvent
+		}
+	}
+
 	return nil
 }
 
@@ -106,7 +146,7 @@ func (m *Manager) loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO; remove hard code, using database or something
+	// TODO; remove hard code, use database or something
 	if req.Username == "test" && req.Password == "test" {
 		type response struct {
 			OTP string `json:"otp"`
@@ -128,9 +168,7 @@ func (m *Manager) loginHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write(data)
 		return
 	}
-
 	w.WriteHeader(http.StatusUnauthorized)
-
 }
 
 func (m *Manager) addClient(client *Client) {
@@ -154,7 +192,7 @@ func checkOrigin(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 
 	switch origin {
-	case "http://localhost:8080":
+	case "https://localhost:8080":
 		return true
 	default:
 		return false

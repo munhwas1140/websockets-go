@@ -28,7 +28,7 @@
             <input type="submit" value="Send message">
         </form>
 
-        <div style="border: 3px solid balck;margin-top:30px;">
+        <div style="border: 3px solid black;margin-top: 30px;">
             <form id="login-form">
                 <label for="username">username:</label>
                 <input type="text" id="username" name="username"><br>
@@ -41,13 +41,48 @@
 
     <script>
 
-        var selectedchat = "general";
+        var selectedChat = "general";
 
         class Event {
             constructor(type, payload) {
                 this.type = type;
                 this.payload = payload;
             }
+        }
+
+        class SendMessageEvent {
+            constructor(message, from) {
+                this.message = message;
+                this.from = from;
+            }
+        }
+
+        class NewMessageEvent {
+            constructor(message, from, sent) {
+                this.message = message;
+                this.from = from;
+                this.sent = sent;
+            }
+        }
+
+        class ChangeChatRoomEvent {
+            constructor(name) {
+                this.name = name;
+            }
+        }
+
+        function changeChatRoom() {
+            var newchat = document.getElementById("chatroom");
+            if (newchat != null && newchat.value != selectedChat) {
+                selectedChat = newchat.value;
+                document.getElementById("chat-header").innerHTML = "Currently in chat: " + selectedChat;
+
+                let changeEvent = new ChangeChatRoomEvent(selectedChat);
+                sendEvent("change_room", changeEvent);
+                textarea = document.getElementById("chatmessages");
+                textarea.innerHTML = `You changed room into: ${selectedChat}`;
+            }
+            return false;
         }
 
         function routeEvent(event) {
@@ -57,7 +92,8 @@
 
             switch(event.type) {
                 case "new_message": 
-                    console.log("new message");
+                    const messageEvent = Object.assign(new NewMessageEvent, event.payload);
+                    appendChatMessage(messageEvent)
                     break;
                 default:
                     alert("unsupported message type");
@@ -65,23 +101,25 @@
             }
         }
 
+        function appendChatMessage(messageEvent) {
+            var date = new Date(messageEvent.sent);
+            const formattedMsg = `${date.toLocaleString()}: ${messageEvent.message}`;
+            
+            textarea = document.getElementById('chatmessages');
+            textarea.innerHTML = textarea.innerHTML + "\n" + formattedMsg;
+            textarea.scrollTop = textarea.scrollHeight 
+        }
+
         function sendEvent(eventName, payload) {
             const event = new Event(eventName, payload);
             conn.send(JSON.stringify(event))
         }
 
-        function changeChatRoom() {
-            var newchat = document.getElementById("chatroom");
-            if (newchat != null && newchat.value != selectedchat) {
-                console.log(newchat);
-            }
-            return false;
-        }
-
         function sendMessage() {
             var newmessage = document.getElementById("message");
             if (newmessage != null) {
-                sendEvent("send_message", newmessage.value);
+                let outgoingEvent = new SendMessageEvent(newmessage.value, "munhwas1140");
+                sendEvent("send_message", outgoingEvent);
             }
             return false;
         }
@@ -114,7 +152,7 @@
             if (window["WebSocket"]) {
                 console.log("supports websockets");
                 // connect to ws
-                conn = new WebSocket("ws://" + document.location.host + "/ws?otp=" + otp);
+                conn = new WebSocket("wss://" + document.location.host + "/ws?otp=" + otp);
 
                 conn.onopen = function(evt) {
                     document.getElementById("connection-header").innerHTML = "Connected to Websocket: true";
